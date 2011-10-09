@@ -65,6 +65,14 @@ $con->reg_cb(
             my ($nick) = $ircmsg->{'prefix'} =~ /^(.*)!/;
             $sth->execute($nick, $msg);
         }
+    },
+    kick => sub {
+        my ($con, $kicked, $channel, $is_myself, $msg, $kicker) = @_;
+        if ($kicked eq $opt{nick}) {
+            $con->send_srv(JOIN => $channel);
+            $con->send_chan($channel, PRIVMSG => ($channel, "Go kick yourself, $kicker!!"));
+            warn $msg if $is_myself;
+        }
     }
 );
 
