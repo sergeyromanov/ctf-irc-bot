@@ -33,7 +33,7 @@ my $con = AnyEvent::IRC::Client->new;
 
 $con->reg_cb(
     join => sub {
-        my ($con, $nick, $channel, $is_myself) = @_; 
+        my ($con, $nick, $channel, $is_myself) = @_;
 
         if ($is_myself && $channel eq $opt{channel}) {
             $con->send_chan($channel, PRIVMSG => $channel, $message);
@@ -46,12 +46,16 @@ $con->reg_cb(
         if ($msg =~ /^showlog\s*(\d*)$/) {
             my $db = connect_db();
             my $count = $1 || 10;
-            my $sql = 'select id, nick, message from messages order by id desc limit '.$count;
+            my $sql = << "SQL";
+select id, nick, message, time
+from messages order by id desc limit $count
+SQL
             my $sth = $db->prepare($sql) or die $db->errstr;
             $sth->execute or die $sth->errstr;
             my $msgs = $sth->fetchall_hashref('id');
             my $log;
-            $log .= $msgs->{$_}{'nick'}.": ".$msgs->{$_}{'message'}."\n"
+            $log .= join '', '[', $msgs->{$_}{'time'}, '] ',
+              $msgs->{$_}{'nick'}, ": ", $msgs->{$_}{'message'}, "\n"
                 for sort {$a <=> $b} keys $msgs;
             my $ua = LWP::UserAgent->new;
             my $res = $ua->post('http://sprunge.us', ['sprunge' => $log])->content;
@@ -99,5 +103,6 @@ __DATA__
 create table if not exists messages (
   id integer primary key autoincrement,
   nick string not null,
-  message string not null
+  message string not null,
+  time timestamp default current_timestamp
 );
