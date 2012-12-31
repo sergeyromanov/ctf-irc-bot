@@ -4,7 +4,7 @@ use warnings;
 
 use AnyEvent;
 use AnyEvent::IRC::Client;
-use AnyEvent::IRC::Util qw/split_prefix/;
+use AnyEvent::IRC::Util qw(split_prefix);
 use Data::Dumper;
 use DBI;
 use Getopt::Long;
@@ -22,8 +22,9 @@ my %opt = (
 
 ### Example:
 # ./bot.pl --channel=#llamaz --nick=mike
-GetOptions(\%opt,'channel=s','nick=s', 'port', 'server', 'verbose|v', 'dbname');
-my $message = shift || "I started logging your asses at @{[ scalar localtime ]}";
+GetOptions(\%opt,'channel=s','nick=s',
+  'port', 'server', 'verbose|v', 'dbname');
+my $message = shift || "I started logging you all at @{[ scalar localtime ]}";
 
 init_db();
 
@@ -32,82 +33,93 @@ if ($opt{verbose}) {
     warn Data::Dumper->Dump([\%opt], [qw(*opt)]);
 }
 
-my $c = AnyEvent->condvar;
+my $c   = AnyEvent->condvar;
 my $con = AnyEvent::IRC::Client->new;
 
 $con->reg_cb(
     join => sub {
-        my ($con, $nick, $channel, $is_myself) = @_;
+        my( $con, $nick, $channel, $is_myself ) = @_;
 
         if ($is_myself && $channel eq $opt{channel}) {
-            $con->send_chan($channel, PRIVMSG => $channel, $message);
+            $con->send_chan( $channel, PRIVMSG => ($channel, $message) );
         }
     },
     publicmsg => sub {
-        my ($con, $nick, $ircmsg) = @_;
+        my( $con, $nick, $ircmsg ) = @_;
 
-        my $msg = $ircmsg->{'params'}[1];
+        my $msg = $ircmsg->{params}[1];
         if ($msg =~ /^showlog\s*(\d*)$/) {
             my $count = $1 || 10;
             my $res = showlog($count);
-            $con->send_chan($opt{'channel'}, PRIVMSG => ($opt{'channel'}, "Last $count messages:$res"));
+            $con->send_chan(
+                $opt{channel},
+                PRIVMSG => ($opt{channel}, "Last $count messages:$res")
+            );
         }
         else {
             my $db = connect_db();
             my $sql = 'insert into messages (nick, message) values (?, ?)';
-            my $sth = $db->prepare($sql) or die $db->errstr;
-            my ($nick) = $ircmsg->{'prefix'} =~ /^(.*)!/;
-            $sth->execute($nick, $msg);
+            my $sth = $db->prepare( $sql ) or die $db->errstr;
+            my( $nick ) = split_prefix( $ircmsg->{prefix} );
+            $sth->execute( $nick, $msg );
         }
     },
     privatemsg => sub {
-        my ($con, $nick, $ircmsg) = @_;
-        my $msg = $ircmsg->{'params'}[1];
+        my( $con, $nick, $ircmsg ) = @_;
+        my $msg = $ircmsg->{params}[1];
         if ($msg =~ /^showlog\s*(\d*)$/) {
             my $count = $1 || 10;
-            my $res = showlog($count);
-            my ($peernick) = split_prefix($ircmsg->{prefix});
-            $con->send_srv(PRIVMSG => $peernick, "Last $count messages:$res");
+            my $res = showlog( $count );
+            my( $peernick ) = split_prefix( $ircmsg->{prefix} );
+            $con->send_srv(
+                PRIVMSG => ($peernick, "Last $count messages:$res")
+            );
         }
     },
     kick => sub {
-        my ($con, $kicked, $channel, $is_myself, $msg, $kicker) = @_;
+        my( $con, $kicked, $channel, $is_myself, $msg, $kicker ) = @_;
         if ($kicked eq $opt{nick}) {
-            $con->send_srv(JOIN => $channel);
-            $con->send_chan($channel, PRIVMSG => ($channel, "Go kick yourself, $kicker!!"));
+            $con->send_srv( JOIN => $channel );
+            $con->send_chan(
+                $channel,
+                PRIVMSG => ($channel, "Go kick yourself, $kicker!!")
+            );
             warn $msg if $is_myself;
         }
     }
 );
 
-$con->connect($opt{server}, $opt{port}, { nick => $opt{nick} });
-$con->send_srv(JOIN => $opt{channel});
+$con->connect ( $opt{server}, $opt{port}, { nick => $opt{nick} } );
+$con->send_srv( JOIN => $opt{channel} );
 
 $c->wait;
 $con->disconnect;
 
 sub showlog {
     my $count = shift;
+
     my $db = connect_db();
     my $sql = << "SQL";
 select id, nick, message, datetime(time, 'localtime') as time
 from messages order by id desc limit $count
 SQL
-    my $sth = $db->prepare($sql) or die $db->errstr;
+    my $sth = $db->prepare( $sql ) or die $db->errstr;
     $sth->execute or die $sth->errstr;
     my $msgs = $sth->fetchall_hashref('id');
     my $log;
-    $log .= join '', '[', $msgs->{$_}{'time'}, '] ',
-    $msgs->{$_}{'nick'}, ": ", $msgs->{$_}{'message'}, "\n"
-    for sort {$a <=> $b} keys $msgs;
+    $log .= join '',
+      '[', $msgs->{$_}{time}, '] ',
+      $msgs->{$_}{nick}, ": ",
+      $msgs->{$_}{message}, "\n" for sort {$a <=> $b} keys $msgs;
     my $ua = LWP::UserAgent->new;
     my $res = $ua->post('http://sprunge.us', ['sprunge' => $log])->content;
     $res =~ s/\n/?irc/;
+
     return $res;
 }
 
 sub connect_db {
-    my $dbfile = $opt{'dbname'};
+    my $dbfile = $opt{dbname};
     my $dbh    = DBI->connect("dbi:SQLite:dbname=$dbfile") or
         die $DBI::errstr;
     return $dbh;
