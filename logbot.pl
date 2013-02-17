@@ -110,7 +110,7 @@ SQL
     $log .= join '',
       '[', $msgs->{$_}{time}, '] ',
       $msgs->{$_}{nick}, ": ",
-      $msgs->{$_}{message}, "\n" for sort {$a <=> $b} keys $msgs;
+      $msgs->{$_}{message}, "\n" for sort {$a <=> $b} keys %{$msgs};
     my $ua = LWP::UserAgent->new;
     my $res = $ua->post('http://sprunge.us', ['sprunge' => $log])->content;
     $res =~ s/\n/?irc/;
