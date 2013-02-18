@@ -1,4 +1,5 @@
 #!/usr/bin/env perl
+
 use strict;
 use warnings;
 
@@ -18,12 +19,14 @@ my %opt = (
     server  => 'irc.freenode.net',
     verbose => undef,
     dbname  => 'irc_log.db',
+    'enable-private' => 0,
 );
 
 ### Example:
-# ./bot.pl --channel=#llamaz --nick=mike
-GetOptions(\%opt,'channel=s','nick=s',
-  'port', 'server', 'verbose|v', 'dbname');
+# ./logbot.pl --channel=#llamaz --nick=mike
+GetOptions(\%opt,'channel=s','nick=s', 'port=s',
+           'server=s', 'verbose|v', 'dbname=s', 'enable-private');
+
 my $message = shift || "I started logging you all at @{[ scalar localtime ]}";
 
 init_db();
@@ -65,6 +68,7 @@ $con->reg_cb(
         }
     },
     privatemsg => sub {
+        return unless $opt{'enable-private'};
         my( $con, $nick, $ircmsg ) = @_;
         my $msg = $ircmsg->{params}[1];
         if ($msg =~ /^showlog\s*(\d*)$/) {
