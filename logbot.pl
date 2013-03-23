@@ -20,12 +20,14 @@ my %opt = (
     verbose => undef,
     dbname  => 'irc_log.db',
     'enable-private' => 0,
+    'no-greeting' => 0,
 );
 
 ### Example:
 # ./logbot.pl --channel=#llamaz --nick=mike
 GetOptions(\%opt,'channel=s','nick=s', 'port=s',
-           'server=s', 'verbose|v', 'dbname=s', 'enable-private');
+           'server=s', 'verbose|v', 'dbname=s', 
+           'enable-private', 'no-greeting');
 
 my $message = shift || "I started logging you all at @{[ scalar localtime ]}";
 
@@ -43,7 +45,7 @@ $con->reg_cb(
     join => sub {
         my( $con, $nick, $channel, $is_myself ) = @_;
 
-        if ($is_myself && $channel eq $opt{channel}) {
+        if (!$opt{'no-greeting'} && $is_myself && $channel eq $opt{channel}) {
             $con->send_chan( $channel, PRIVMSG => ($channel, $message) );
         }
     },
@@ -76,7 +78,7 @@ $con->reg_cb(
             my $res = showlog( $count );
             my( $peernick ) = split_prefix( $ircmsg->{prefix} );
             $con->send_srv(
-                PRIVMSG => ($peernick, "Last $count messages:$res")
+                PRIVMSG => ($peernick, "Last $count messages: $res")
             );
         }
     },
