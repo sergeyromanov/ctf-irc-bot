@@ -60,11 +60,20 @@ $con->reg_cb(
             );
         }
         else {
-            my $db = connect_db();
-            my $sql = 'insert into messages (nick, message) values (?, ?)';
-            my $sth = $db->prepare( $sql ) or die $db->errstr;
-            my( $nick ) = split_prefix( $ircmsg->{prefix} );
-            $sth->execute( $nick, $msg );
+            if ($msg =~ /^lastmsg$/) {
+                my $res = getlast(1);
+                $con->send_chan(
+                    $opt{channel},
+                    PRIVMSG => ($opt{channel}, "Last message: $res")
+                );
+            }
+            else {
+                my $db = connect_db();
+                my $sql = 'insert into messages (nick, message) values (?, ?)';
+                my $sth = $db->prepare( $sql ) or die $db->errstr;
+                my( $nick ) = split_prefix( $ircmsg->{prefix} );
+                $sth->execute( $nick, $msg );
+            }
         }
     },
     privatemsg => sub {
@@ -98,6 +107,26 @@ $con->send_srv( JOIN => $opt{channel} );
 
 $c->wait;
 $con->disconnect;
+
+sub getlast {
+    my $count = shift;
+
+    my $db = connect_db();
+    my $sql = << "SQL";
+select id, nick, message, datetime(time, 'localtime') as time
+from messages order by id desc limit $count
+SQL
+    my $sth = $db->prepare( $sql ) or die $db->errstr;
+    $sth->execute or die $sth->errstr;
+    my $msgs = $sth->fetchall_hashref('id');
+    my $log;
+    $log .= join '',
+      '[', $msgs->{$_}{time}, '] ',
+      $msgs->{$_}{nick}, ": ",
+      $msgs->{$_}{message}, "\n" for sort {$a <=> $b} keys %{$msgs};
+
+    return $log;
+}
 
 sub showlog {
     my $count = shift;
