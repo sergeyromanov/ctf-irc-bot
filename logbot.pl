@@ -131,19 +131,7 @@ SQL
 sub showlog {
     my $count = shift;
 
-    my $db = connect_db();
-    my $sql = << "SQL";
-select id, nick, message, datetime(time, 'localtime') as time
-from messages order by id desc limit $count
-SQL
-    my $sth = $db->prepare( $sql ) or die $db->errstr;
-    $sth->execute or die $sth->errstr;
-    my $msgs = $sth->fetchall_hashref('id');
-    my $log;
-    $log .= join '',
-      '[', $msgs->{$_}{time}, '] ',
-      $msgs->{$_}{nick}, ": ",
-      $msgs->{$_}{message}, "\n" for sort {$a <=> $b} keys %{$msgs};
+    my $log = getlast($count);
     my $ua = LWP::UserAgent->new;
     my $res = $ua->post('http://sprunge.us', ['sprunge' => $log])->content;
     $res =~ s/\n/?irc/;
