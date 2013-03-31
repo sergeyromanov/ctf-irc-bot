@@ -62,11 +62,20 @@ $con->reg_cb(
             );
         }
         else {
-            my $db = connect_db();
-            my $sql = 'insert into messages (nick, message) values (?, ?)';
-            my $sth = $db->prepare( $sql ) or die $db->errstr;
-            my( $nick ) = split_prefix( $ircmsg->{prefix} );
-            $sth->execute( $nick, $msg );
+            if ($msg =~ /^lastmsg$/) {
+                my $res = getlast(1);
+                $con->send_chan(
+                    $opt{channel},
+                    PRIVMSG => ($opt{channel}, "Last message: $res")
+                );
+            }
+            else {
+                my $db = connect_db();
+                my $sql = 'insert into messages (nick, message) values (?, ?)';
+                my $sth = $db->prepare( $sql ) or die $db->errstr;
+                my( $nick ) = split_prefix( $ircmsg->{prefix} );
+                $sth->execute( $nick, $msg );
+            }
         }
     },
     privatemsg => sub {
@@ -101,7 +110,7 @@ $con->send_srv( JOIN => $opt{channel} );
 $c->wait;
 $con->disconnect;
 
-sub showlog {
+sub getlast {
     my $count = shift;
 
     my $db = connect_db();
@@ -117,6 +126,14 @@ SQL
       '[', $msgs->{$_}{time}, '] ',
       $msgs->{$_}{nick}, ": ",
       $msgs->{$_}{message}, "\n" for sort {$a <=> $b} keys %{$msgs};
+
+    return $log;
+}
+
+sub showlog {
+    my $count = shift;
+
+    my $log = getlast($count);
     my $ua = LWP::UserAgent->new;
     my $res = $ua->post('http://sprunge.us', ['sprunge' => $log])->content;
     $res =~ s/\n/?irc/;
