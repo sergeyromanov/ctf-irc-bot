@@ -11,6 +11,10 @@ use DBI;
 use Getopt::Long;
 use LWP::UserAgent;
 
+use constant {
+  DEFAULT_MESSAGE_NUM => 10
+};
+
 $| = 1;
 my %opt = (
     channel => '#burato',
@@ -54,40 +58,44 @@ $con->reg_cb(
 
         my $msg = $ircmsg->{params}[1];
         if ($msg =~ /^showlog\s*(\d*)$/) {
-            my $count = $1 || 10;
-            my $res = showlog($count);
+            my $count = $1 || DEFAULT_MESSAGE_NUM;
+            my $res = showlog( $count );
             $con->send_chan(
                 $opt{channel},
-                PRIVMSG => ($opt{channel}, "Last $count messages:$res")
+                PRIVMSG => ($opt{channel}, "Last $count messages: $res")
+            );
+        }
+        elsif ($msg =~ /^lastmsg$/) {
+            my $res = getlast(1);
+            $con->send_chan(
+                $opt{channel},
+                PRIVMSG => ($opt{channel}, "Last message: $res")
             );
         }
         else {
-            if ($msg =~ /^lastmsg$/) {
-                my $res = getlast(1);
-                $con->send_chan(
-                    $opt{channel},
-                    PRIVMSG => ($opt{channel}, "Last message: $res")
-                );
-            }
-            else {
-                my $db = connect_db();
-                my $sql = 'insert into messages (nick, message) values (?, ?)';
-                my $sth = $db->prepare( $sql ) or die $db->errstr;
-                my( $nick ) = split_prefix( $ircmsg->{prefix} );
-                $sth->execute( $nick, $msg );
-            }
+            my $db = connect_db();
+            my $sql = 'insert into messages (nick, message) values (?, ?)';
+            my $sth = $db->prepare( $sql ) or die $db->errstr;
+            my( $nick ) = split_prefix( $ircmsg->{prefix} );
+            $sth->execute( $nick, $msg );
         }
     },
     privatemsg => sub {
         return unless $opt{'enable-private'};
         my( $con, $nick, $ircmsg ) = @_;
+        my( $peernick ) = split_prefix( $ircmsg->{prefix} );
         my $msg = $ircmsg->{params}[1];
         if ($msg =~ /^showlog\s*(\d*)$/) {
-            my $count = $1 || 10;
+            my $count = $1 || DEFAULT_MESSAGE_NUM;
             my $res = showlog( $count );
-            my( $peernick ) = split_prefix( $ircmsg->{prefix} );
             $con->send_srv(
                 PRIVMSG => ($peernick, "Last $count messages: $res")
+            );
+        }
+        elsif ($msg =~ /^lastmsg$/) {
+            my $res = getlast(1);
+            $con->send_srv(
+                PRIVMSG => ($peernick, "Last message: $res")
             );
         }
     },
