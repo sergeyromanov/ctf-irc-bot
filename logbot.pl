@@ -6,10 +6,9 @@ use warnings;
 use AnyEvent;
 use AnyEvent::IRC::Client;
 use AnyEvent::IRC::Util qw(split_prefix);
-use Data::Dumper;
 use DBI;
 use Getopt::Long;
-use LWP::UserAgent;
+use HTTP::Tiny;
 
 use constant {
   DEFAULT_MESSAGE_NUM => 10
@@ -21,7 +20,6 @@ my %opt = (
     nick    => "logger1",
     port    => 6667,
     server  => 'irc.freenode.net',
-    verbose => undef,
     dbname  => 'irc_log.db',
     'enable-private' => 0,
     'no-greeting' => 0,
@@ -30,17 +28,12 @@ my %opt = (
 ### Example:
 # ./logbot.pl --channel=#llamaz --nick=mike
 GetOptions(\%opt,'channel=s','nick=s', 'port=s',
-           'server=s', 'verbose|v', 'dbname=s', 
+           'server=s', 'dbname=s',
            'enable-private', 'no-greeting');
 
 my $message = shift || "I started logging you all at @{[ scalar localtime ]}";
 
 init_db();
-
-if ($opt{verbose}) {
-    warn "message is: '$message'";
-    warn Data::Dumper->Dump([\%opt], [qw(*opt)]);
-}
 
 my $c   = AnyEvent->condvar;
 my $con = AnyEvent::IRC::Client->new;
@@ -142,9 +135,11 @@ sub showlog {
     my $count = shift;
 
     my $log = getlast($count);
-    my $ua = LWP::UserAgent->new;
-    my $res = $ua->post('http://sprunge.us', ['sprunge' => $log])->content;
-    $res =~ s/\n/?irc/;
+    my $ua = HTTP::Tiny->new;
+    my $res = $ua
+      ->post_form('http://sprunge.us', {sprunge => $log})
+      ->{content};
+    $res =~ s/\s*$/?irc/;
 
     return $res;
 }
