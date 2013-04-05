@@ -31,7 +31,7 @@ GetOptions(\%opt,'channel=s','nick=s', 'port=s',
            'server=s', 'dbname=s',
            'enable-private', 'no-greeting');
 
-my $message = shift || "I started logging you all at @{[ scalar localtime ]}";
+my $message = shift || "I started logging you all at " . localtime;
 
 init_db();
 
