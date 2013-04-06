@@ -22,7 +22,7 @@ my %opt = (
     server  => 'irc.freenode.net',
     dbname  => 'irc_log.db',
     'enable-private' => 0,
-    'no-greeting' => 0,
+    'no-greeting'    => 0,
 );
 
 ### Example:
@@ -32,6 +32,7 @@ GetOptions(\%opt,'channel=s','nick=s', 'port=s',
            'enable-private', 'no-greeting');
 
 my $message = shift || "I started logging you all at " . localtime;
+my $ua = HTTP::Tiny->new;
 
 init_db();
 
@@ -135,7 +136,6 @@ sub showlog {
     my $count = shift;
 
     my $log = getlast($count);
-    my $ua = HTTP::Tiny->new;
     my $res = $ua
       ->post_form('http://sprunge.us', {sprunge => $log})
       ->{content};
@@ -146,8 +146,8 @@ sub showlog {
 
 sub connect_db {
     my $dbfile = $opt{dbname};
-    my $dbh    = DBI->connect("dbi:SQLite:dbname=$dbfile") or
-        die $DBI::errstr;
+    my $dbh    = DBI->connect("dbi:SQLite:dbname=$dbfile")
+      or die $DBI::errstr;
     return $dbh;
 }
 
