@@ -11,7 +11,7 @@ use Getopt::Long;
 use HTTP::Tiny;
 
 use constant {
-  DEFAULT_MESSAGE_NUM => 10
+    DEFAULT_MESSAGE_NUM => 10
 };
 
 $| = 1;
@@ -27,9 +27,10 @@ my %opt = (
 
 ### Example:
 # ./logbot.pl --channel=#llamaz --nick=mike
-GetOptions(\%opt,'channel=s','nick=s', 'port=s',
-           'server=s', 'dbname=s',
-           'enable-private', 'no-greeting');
+GetOptions(\%opt,
+    'channel=s', 'nick=s', 'port=s', 'server=s', 'dbname=s',
+    'enable-private', 'no-greeting'
+);
 
 my $message = shift || "I started logging you all at " . localtime;
 my $ua = HTTP::Tiny->new;
