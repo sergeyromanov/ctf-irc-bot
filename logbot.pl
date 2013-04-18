@@ -104,7 +104,15 @@ $con->reg_cb(
             );
             warn $msg if $is_myself;
         }
-    }
+    },
+    quit => sub {
+        my( $con, $nick, $msg ) = @_;
+
+        my $db = connect_db();
+        my $sql = 'insert into messages (nick, message) values (?, ?)';
+        my $sth = $db->prepare( $sql ) or die $db->errstr;
+        $sth->execute( $nick, $msg );
+    },
 );
 
 $con->connect ( $opt{server}, $opt{port}, { nick => $opt{nick} } );
